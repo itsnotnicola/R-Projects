@@ -1,0 +1,703 @@
+---
+title: "SI 348 Assignment"
+format: html
+editor: visual
+---
+
+# SI 348 Assignment File
+
+## Project 2: Customer Segmentation in Retail Data
+
+### Loading Packages
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(scales)
+```
+
+### Data Cleaning and Preparation
+
+#### Loading the Provided Dataset into R for Project 2
+
+```{r}
+#The provided data set for Project 2 is loaded into R using a relative path in order to make the code fully reproducible.
+
+online_retail_path <- "Data/project_2_data/Online Retail.xlsx" #Using a relative path
+online_retail <- read_excel(online_retail_path)
+```
+
+#### Performing the Initial Inspection
+
+```{r}
+online_retail
+glimpse(online_retail)
+view(online_retail)
+```
+
+#### Inspecting Column Values
+
+```{r}
+#InvoiceNo
+
+#1
+#Filtering InvoiceNo to check for NA values
+online_retail |>
+  filter(is.na(InvoiceNo))
+#2
+#Filtering InvoiceNo to guage the significance of 'C' in InvoiceNo
+online_retail |>
+  filter(str_detect(InvoiceNo, "(C[0-9]).*"))
+
+#StockCode
+
+#3
+#Filtering StockCode to check for NA values
+online_retail |>
+  filter(is.na(StockCode))
+#4
+#Filtering StockCode for distinct categorical values which do not contain integers to guage the significance of these occurences
+online_retail |>
+  filter(StockCode %in% LETTERS[1:26] | StockCode %in% letters[1:26]) |>
+  distinct(StockCode)
+#5 
+#Filtering to view records associated with distinct categorical values found in the previous step to guage their significance
+online_retail |>
+  filter(StockCode == 'D'| StockCode == 'M'| StockCode == 'S'| StockCode == 'm' | StockCode == 'B') |>
+  group_by(StockCode) |>
+  arrange(InvoiceNo)
+#6
+#Filtering to view StockCodes which begin with letters to guage their significance
+online_retail |>
+  filter(str_detect(StockCode, "[A-Za-z][0-9]+"))
+
+#Description
+
+#7
+#Filtering Description to check for NA values
+online_retail |>
+  filter(is.na(Description))
+#8
+#Filtering Description to check for a fixed value such as '?' and it's significance within it's row
+online_retail |>
+  filter(str_detect(Description, "\\?"))
+
+#Quantity
+
+#9
+#Filtering Quantity to check for NA values
+online_retail |>
+  filter(is.na(Quantity))
+#10
+#Filtering to check for the presence of '0' as a Quantity
+online_retail |>
+  filter(Quantity==0)
+
+#InvoiceDate
+
+#11
+#Filtering InvoiceDate to check for NA values
+online_retail |>
+  filter(is.na(InvoiceDate))
+
+#UnitPrice
+
+#12
+#Filtering UnitPrice to check for NA values
+online_retail |>
+  filter(is.na(UnitPrice))
+#13
+#Filtering to check for the presence of '0' as a UnitPrice
+online_retail |>
+  filter(UnitPrice==0)
+
+#CustomerID
+
+#14
+#Filtering CustomerID to check for NA values
+online_retail |>
+  filter(is.na(CustomerID))
+
+#Country
+
+#15
+#Filtering Country to check for NA values
+online_retail |>
+  filter(is.na(Country))
+```
+
+#### Addressing Any Missing Values
+
+##### Fixed Values
+
+```{r}
+ #| cache: true
+ 
+#Regular Expressions to tidy fixed values in 'DESCRIPTION' column of the dataset
+online_retail <- online_retail |>
+  mutate(
+    Description = str_replace_all(str_to_upper(Description), ".*SOLD.*\\bSET.*\\b\\?", "SOLD IN SET"),
+    Description = str_replace_all(str_to_upper(Description), "^SOLD AS.*", "SOLD IN SET"),
+    Description = str_replace_all(str_to_upper(Description), "^WRONGLY SOLD AS.*", "SOLD IN SET"),
+    Description = str_replace_all(str_to_upper(Description), ".*LOST.*", "LOST"),
+    Description = str_replace_all(str_to_upper(Description), ".*MISSING.*", "MISSING"),
+    Description = str_replace_all(str_to_upper(Description), ".*DAMAGES.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*DAMAGED.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*WET.*", "WATER DAMAGE"),
+    Description = str_replace_all(str_to_upper(Description), ".*DISPLAY.*", "DISPLAY"),
+    Description = str_replace_all(str_to_upper(Description), ".*CODE.*", "BARCODE PROBLEM"),
+    Description = str_replace_all(str_to_upper(Description), ".*WATER.*\\bDAMAGE.*", "WATER DAMAGE"),
+    Description = str_replace_all(str_to_upper(Description), ".*HISTORIC.*\\bCOMPUTER.*", "UNKNOWN"),
+    Description = str_replace_all(str_to_upper(Description), "^CHECK$", "STOCK CHECK"),
+    Description = str_replace_all(str_to_upper(Description), "^STOCK CHECK$", "STOCK CHECK"),
+    Description = str_replace_all(str_to_upper(Description), "^CHECK\\?$", "STOCK CHECK"),
+    Description = str_replace_all(str_to_upper(Description), "AMAZON(?! FEE)", "AMAZON"),
+    Description = str_replace_all(str_to_upper(Description), "AMAZON S.*", "AMAZON"),
+    Description = str_replace_all(str_to_upper(Description), "AMAZON A.*", "AMAZON"),
+    Description = str_replace_all(str_to_upper(Description), "^EBAY.*", "EBAY"),
+    Description = str_replace_all(str_to_upper(Description), ".*AWAY.*", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDED.", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDED$", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDED.*", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDED-", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDEDC", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDEDR", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDEDN'T", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDEDUSTY", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^DISCARDEDL.*", "DISCARDED"),
+    Description = str_replace_all(str_to_upper(Description), "^WRONGLY.*", "INCORRECT"),
+    Description = str_replace_all(str_to_upper(Description), ".*UNSALEABLE.*", "UNSALEABLE"),
+    Description = str_replace_all(str_to_upper(Description), "^INCORRECT.*", "INCORRECT"),
+    Description = str_replace_all(str_to_upper(Description), "^MYSTERY.*", "UNKNOWN"),
+    Description = str_replace_all(str_to_upper(Description), "^COUNTED.*", "STOCK CHECK"),
+    Description = str_replace_all(str_to_upper(Description), "^MERCHANT*", "ERROR"),
+    Description = str_replace_all(str_to_upper(Description), ".*DOTCOM.*", "DOTCOM"),
+    Description = str_replace_all(str_to_upper(Description), "^BROKEN*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*ADJUST.*", "INCORRECT"),
+    Description = str_replace_all(str_to_upper(Description), ".*BROKEN.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*ERROR.*", "ERROR"),
+    Description = str_replace_all(str_to_upper(Description), ".*MIXED UP.*", "ERROR"),
+    Description = str_replace_all(str_to_upper(Description), ".*\bMIX UP\b.*", "ERROR"),
+    Description = str_replace_all(str_to_upper(Description), ".*CRUSHED.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*SMASHED.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*[0-9]+.*", "ERROR"),
+    Description = str_replace_all(str_to_upper(Description), "\bNOT\b", "UNKNOWN"),
+    Description = str_replace_all(str_to_upper(Description), "CAN'T FIND", "MISSING"),
+    Description = str_replace_all(str_to_upper(Description), ".*MOULDY.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*CRACKED.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*SHOWROOM", "DISPLAY"),
+    Description = str_replace_all(str_to_upper(Description), ".*WRONG.*", "INCORRECT"),
+    Description = str_replace_all(str_to_upper(Description), ".*FAULTY", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*DAGAMED", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*TEST", "UNKNOWN"),
+    Description = str_replace_all(str_to_upper(Description), ".*MIXED UP.*", "ERROR"),
+    Description = str_replace_all(str_to_upper(Description), "\bMIA\b", "LOST"),
+    Description = str_replace_all(str_to_upper(Description), ".*BREAKAGES.*", "DAMAGES"),
+    Description = str_replace_all(str_to_upper(Description), ".*POSTAGE.*", "POSTAGE"),
+    Description = str_replace_all(str_to_upper(Description), ".*FOUND.*", "FOUND"),
+    Description = str_replace_all(str_to_upper(Description), ".*DISCOUNT.*", "DISCOUNT"),
+    Description = str_replace_all(str_to_upper(Description), "^[*]", gsub("^[*]", "", Description)),
+  )
+
+view(online_retail) #view and confirm fixed values have been sucecssfully tidied
+```
+
+```{r}
+#Converting unclear/unspecified column values to NA
+online_retail <- online_retail |>
+  mutate(
+    Description= na_if(Description, '?'),
+    Description= na_if(Description, '??'),
+    Description= na_if(Description, '???'),
+    UnitPrice= na_if(UnitPrice,0),
+  ) |>
+  arrange(InvoiceNo) #Filter according to InvoiceNo
+```
+
+##### Last Observation Carried Forward
+
+```{r}
+#Implementing the Last Observation Carried Forward method to deal with presence of NA values in the data set.
+online_retail <- online_retail |>
+  fill(everything())
+
+#Inspecting the dataset and confirming no presence of NA values in each column, LOCF was successful
+online_retail |>
+  filter(is.na(InvoiceNo) | is.na(StockCode) | is.na(Description) | is.na(Quantity) |is.na(InvoiceDate) | is.na(UnitPrice) | is.na(CustomerID) | is.na(Country))
+
+```
+
+#### Categorizing the Data
+
+```{r}
+#Adding a column to categorise each entry based on its categorical Description or StockCode value
+online_retail <- online_retail|>
+  mutate(
+    Category = case_when(
+      StockCode == 'D' ~ 'DISCOUNT',
+      Description == 'DISCOUNT' ~ 'DISCOUNT',
+      StockCode == 'M' ~ 'MANUAL',
+      Description =='MANUAL' ~ 'MANUAL',
+      Description =='LOST' ~ 'LOST',
+      Description =='MISSING' ~ 'MISSING',
+      Description =='DAMAGES' ~ 'DAMAGES',
+      Description =='WATER DAMAGE' ~ 'WATER DAMAGE',
+      Description =='DISPLAY' ~ 'DISPLAY',
+      Description =='BARCODE PROBLEM' ~ 'BARCODE PROBLEM',
+      Description =='UNKNOWN' ~ 'UNKNOWN',
+      Description == 'STOCK CHECK' ~ 'STOCK CHECK',
+      StockCode == 'S' ~ 'SAMPLE',
+      Description == 'AMAZON' ~ 'AMAZON',
+      Description == 'EBAY' ~ 'EBAY',
+      str_detect(InvoiceNo, "(C[0-9]+)") ~ 'CANCELLED',
+      Description == 'DISCARDED' ~ 'DISCARDED',
+      Description == 'UNSALEABLE' ~ 'UNSALEABLE',
+      Description == 'INCORRECT' ~ 'INCORRECT',
+      Description == 'ERROR' ~ 'ERROR',
+      Description == 'DOTCOM' ~ 'DOTCOM',
+      Description == 'POSTAGE' ~ 'POSTAGE',
+      Description == 'FOUND' ~ 'FOUND',
+      TRUE ~ 'SALE'
+    )
+  )
+
+#Confirm all entires have been categorised
+online_retail |>
+  filter(is.na(Category))
+
+```
+
+#### Variable Calculations
+
+```{r}
+#Adding a column calculate the TotalPrice of each entry using UnitPrice and Quantity
+online_retail <- online_retail |>
+  mutate(
+    TotalPrice = round(Quantity * UnitPrice, 2)
+  ) |>
+  relocate(InvoiceNo, StockCode, Description, Quantity, InvoiceDate, UnitPrice, TotalPrice, CustomerID, Country, Category) #Reordering columns to include new column TotalPrice next to UnitPrice 
+
+view(online_retail) #View and confirm column updates
+```
+
+### Exploratory Data Analysis
+
+#### Summary Statistics
+
+```{r}
+#Quantity - key variable
+
+#1
+#Quantity Variation by Invoice Date
+#Creating a new dataframe to summarise the total Quantities of items purchased per recorded InvoiceDate in the dataset
+QuantityByInvoiceDate <- online_retail |>
+  filter(Category=='SALE') |>
+  group_by(InvoiceDate) |>
+  mutate(
+    InvoiceDate = gsub(" .*","", InvoiceDate) #Removing time from InvoiceDate
+  ) |>
+  summarise(
+    TotalQuantity = sum(Quantity),
+    .groups = 'drop'
+    ) |>
+  arrange()
+QuantityByInvoiceDate
+
+#2
+#Quantity Variation by Country
+#Creating a new dataframe to summarise the total Quantities of items purchased by each Country in the dataset
+QuantityByCountry <- online_retail |>
+  filter(Category=='SALE') |>
+  group_by(Country) |>
+  summarise(
+    TotalQuantity = sum(Quantity),
+    .groups = 'drop'
+  )
+QuantityByCountry
+
+#3
+#Cancelled Quantity variation by InvoiceDate
+#Creating a new dataframe to summarise the total Quantities of items cancelled/returned by InvoiceDate in the dataset
+ReturnsByDate <- online_retail |>
+  filter(Category == 'CANCELLED') |>
+  mutate(
+    InvoiceDate = as.Date(gsub(" .*", "", InvoiceDate))  # Removing time from InvoiceDate
+  ) |>
+  group_by(InvoiceDate, Category) |>
+  summarise(
+    TotalQuantity = sum(abs(Quantity)),
+    .groups = 'drop'
+    ) |>
+  group_by(InvoiceDate) |>
+  filter(TotalQuantity == max(TotalQuantity)) |>
+  select(InvoiceDate, Category, TotalQuantity)
+
+ReturnsByDate <- ReturnsByDate |>
+  mutate(
+    year= year(ymd(InvoiceDate))
+  )
+ReturnsByDate
+```
+
+```{r}
+#TotalPrice - Key Variable
+
+#1
+#TotalPrice Variation by InvoiceDate
+#Creating a new data frame to summarise the TotalPrice of items purchased per day recorded in the dataset
+TotalPriceByDate <- online_retail |>
+  filter(Category=='SALE') |>
+  group_by(InvoiceDate) |>
+  mutate(
+    InvoiceDate = gsub(" .*","", InvoiceDate) #Removing time from InvoiceDate
+  ) |>
+  summarise(
+    SumPrice = sum(TotalPrice)
+    )
+TotalPriceByDate
+
+#2
+#TotalPrice Variation by Country
+#Creating a new data frame to summarise the TotalPrice of items purchased per country recorded in the dataset
+TotalPriceByCountry <- online_retail |>
+  filter(Category=='SALE') |>
+  group_by(Country) |>
+  summarise(
+    SumPrice = sum(TotalPrice)
+    )
+TotalPriceByCountry
+```
+
+#### Visualizations
+
+```{r}
+#Quantity - key variable
+
+#1
+#Quantity Variation by Invoice Date
+#Plotting a scatterplot illustrating the variation in Quantity of customer purchases throughout the year from December 2010 - December 2011
+#Including Outliers
+
+#Extract 'year' value from InvoiceDate and mutate to new column in format 'year'
+QuantityByInvoiceDate <- QuantityByInvoiceDate |>
+  mutate(
+    year= year(ymd(InvoiceDate)) 
+    )
+
+#Scatterplott
+ggplot(
+  data= QuantityByInvoiceDate,
+  mapping = aes(y = TotalQuantity, x = ymd(InvoiceDate), colour=factor(year)) #Factor colour by year using new column 'year' created
+) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, se = FALSE, method = 'loess') + #Add line of best fit
+  scale_x_date(                     #Override default daily labels
+    labels = date_format("%B"),       #Format labels to show full month names
+    breaks = "1 month",               #Set breaks to every month
+    guide = guide_axis(n.dodge = 2) #Dodge x axis labels
+  ) +
+  labs( #Add labels
+    x = "Month",
+    y = "Quantity of Customer Purchases",
+    colour = "Year",
+    title= "Variation in Quantity of Customer Purchases December 2010- December 2011",
+    subtitle = "Including Outliers"
+    ) +
+  scale_color_brewer(palette = "Set1") +  #Set Colour palette
+  theme_minimal()                         #Change theme
+
+```
+
+```{r}
+#Quantity - key variable
+
+#2
+#Quantity Variation by Invoice Date
+#Plotting a scatterplot illustrating the variation in Quantity of customer purchases throughout the year from December 2010 - December 2011
+#Excluding Outliers
+
+options(warn = -1) #Don't show warnings
+
+#Extract 'year' value from InvoiceDate and mutate to new column in format 'year'
+QuantityByInvoiceDate <- QuantityByInvoiceDate |>
+  mutate(
+    year= year(ymd(InvoiceDate))
+    )
+
+#Scatterplot
+ggplot(
+  data= QuantityByInvoiceDate,
+  mapping = aes(y = TotalQuantity, x = ymd(InvoiceDate), colour=factor(year))
+) +
+  geom_point() +
+  scale_x_date(
+    labels = date_format("%B"),  #Format labels to show full month names
+    breaks = "1 month",          #Set breaks to every month
+    guide = guide_axis(n.dodge = 2) #Dodge x axis labels
+  ) +
+  labs(                          #Edit labels
+    x = "Month",
+    y = "Quantity of Customer Purchases",
+    colour = "Year",
+    title= "Variation in Quantity of Customer Purchases December 2010- December 2011",
+    subtitle = "Excluding Outliers"
+    ) +
+    scale_color_brewer(palette = "Set1") + 
+    ylim(0, 40000) +            #Exclude outlier values 
+  geom_smooth(formula = y ~ x, se = FALSE, method = 'loess') + #Add line of best fit
+  theme_minimal() #Change theme
+
+
+```
+
+```{r}
+#Quantity - key variable
+
+#3
+#Quantity Variation by Country
+#Plotting a bar graph illustrating the variation in Quantity of customer purchases by Country in the dataset
+#Including Outliers
+
+options(scipen = 999) #Removing Scientific Notation
+
+#Plotting the bar graph
+ggplot(
+  data= QuantityByCountry,
+  mapping = aes( x= Country, y=TotalQuantity )
+) +
+  geom_bar(stat="identity") + #Change from density to allow for x and y variables
+  coord_flip() +              #Flip coords for axis legibility
+  labs(                       #Add labels
+    y = "Total Quantity of Customer Purchases",
+    x = "Country",
+    title= "Variation in Quantity of Customer Purchases per Country December 2010- December 2011",
+    subtitle = "Including Outliers"
+    ) +
+  theme_minimal() #Change theme
+    
+```
+
+```{r}
+#Quantity - key variable
+
+#4
+#Quantity Variation by Country
+#Plotting a bar graph illustrating the variation in Quantity of customer purchases by Country in the dataset
+#Excluding Outliers
+
+options(scipen = 999) #Removing Scientific Notation
+
+QuantityByCountryOutliers <- QuantityByCountry |>
+  filter(TotalQuantity < 500000)  #Filter out outliers
+
+#Plotting the bar graph
+ggplot(
+  data= QuantityByCountryOutliers,
+  mapping = aes( x= Country, y=TotalQuantity )
+) +
+  geom_bar(stat="identity") + #Change from density to allow for x and y variables
+  coord_flip() +              #Flip coords for axis legibility
+  labs(                       #Add labels
+    y = "Total Quantity of Customer Purchases",
+    x = "Country",
+    title= "Variation in Quantity of Customer Purchases per Country December 2010- December 2011",
+    subtitle = "Excluding Outliers"
+    ) +
+  theme_minimal() #Change theme
+```
+
+```{r}
+#Quantity - key variable
+
+#5
+#Variation in 'CANCELLED' Category by Date
+#Plotting a scatterplot illustrating the variation in Quantity of customer purchases categorised as 'CANCELLED', indicating a return, from December 2010 - December 2011
+#Including Outliers
+
+#Scatterplot
+ggplot(
+  data= ReturnsByDate,
+  mapping = aes( x = ymd(InvoiceDate), y= abs(TotalQuantity), colour=factor(year))
+) + 
+  geom_point() +
+  scale_x_date(
+    labels = date_format("%B"),  #Format labels to show full month names
+    breaks = "1 month",          #Set breaks to every month
+    guide = guide_axis(n.dodge = 2) #Dodge x axis labels
+  ) +
+  labs(                          #Change labels
+    x = "Month",
+    y = "Quantity of Items Returned",
+    colour = "Year",
+    title= "Variation in Quantity of Items Returned December 2010- December 2011",
+    subtitle = "Including Outliers"
+    ) +
+  scale_color_brewer(palette = "Set1") +      #Change colour palette
+  theme_minimal()                             #Change theme
+```
+
+```{r}
+#Quantity - key variable
+
+#5
+#Variation in 'CANCELLED' Category by Date
+#Plotting a scatterplot illustrating the variation in Quantity of customer purchases categorised as 'CANCELLED', indicating a return, from December 2010 - December 2011
+#Excluding Outliers
+
+options(warn = -1) #Don't show warnings
+
+#Scatterplot
+ggplot(
+  data= ReturnsByDate,
+  mapping = aes( x = ymd(InvoiceDate), y= abs(TotalQuantity), colour=factor(year))
+) + 
+  geom_point() +
+  scale_x_date(
+    labels = date_format("%B"),  #Format labels to show full month names
+    breaks = "1 month",          #Set breaks to every month
+    guide = guide_axis(n.dodge = 2) #Dodge x axis labels
+  ) +
+  labs(                          #Change labels
+    x = "Month",
+    y = "Quantity of Items Returned",
+    colour = "Year",
+    title= "Variation in Quantity of Items Returned December 2010- December 2011",
+    subtitle = "Excluding Outliers"
+    ) +
+  scale_color_brewer(palette = "Set1") +      #Change colour palette
+  theme_minimal() +                           #Change theme
+  ylim(0,13000)                               #Exclude outliers
+```
+
+```{r}
+#TotalPrice - Key Variable
+
+#1
+#TotalPrice Variation by InvoiceDate
+#Plotting a scatterplot illustrating the variation in the TotalPrice of customer purchases by InvoiceDate, from December 2010 - December 2011
+#Inluding Outliers
+
+#Extract 'year' value from InvoiceDate and mutate to new column in format 'year'
+TotalPriceByDate <- TotalPriceByDate |>
+  mutate(
+    year= year(ymd(InvoiceDate))
+    )
+
+#Scatterplot
+ggplot(
+  data= TotalPriceByDate,
+  mapping = aes(y = SumPrice, x = ymd(InvoiceDate), colour=factor(year))
+) +
+  geom_point() +
+  scale_x_date(
+    labels = date_format("%B"),  #Format labels to show full month names
+    breaks = "1 month",          #Set breaks to every month
+    guide = guide_axis(n.dodge = 2) #Dodge x axis labels
+  ) +
+  labs(                          #Change labels
+    x = "Month",
+    y = "Total Price of Customer Purchases",
+    colour = "Year",
+    title= "Variation in the Total Price of Customer Purchases per Day December 2010- December 2011",
+    subtitle = "Including Outliers"
+    ) +
+    scale_color_brewer(palette = "Set1") +  #Change colour palette
+    theme_minimal()                         #change theme
+```
+
+```{r}
+#TotalPrice - Key Variable
+
+#2
+#TotalPrice Variation by InvoiceDate
+#Plotting a scatterplot illustrating the variation in the TotalPrice of customer purchases by InvoiceDate, from December 2010 - December 2011
+#Excluding Outliers
+
+options(warn = -1) #Don't show warnings
+
+#Extract 'year' value from InvoiceDate and mutate to new column in format 'year'
+TotalPriceByDateOutliers <- TotalPriceByDate |>
+  mutate(
+    year= year(ymd(InvoiceDate))
+    )
+
+#Scatterplot
+ggplot(
+  data= TotalPriceByDateOutliers,
+  mapping = aes(y = SumPrice, x = ymd(InvoiceDate), colour=factor(year))
+) +
+  geom_point() +
+  scale_x_date(
+    labels = date_format("%B"),  #Format labels to show full month names
+    breaks = "1 month",          #Set breaks to every month
+    guide = guide_axis(n.dodge = 2) #Dodge x axis labels
+  ) +
+  labs(                          #Change lables
+    x = "Month",
+    y = "Total Price of Customer Purchases",
+    colour = "Year",
+    title= "Variation in the Total Price of Customer Purchases per Day December 2010- December 2011",
+    subtitle = "Excluding Outliers"
+    ) +
+    scale_color_brewer(palette = "Set1") +  #Set colour palette
+    ylim(0, 100000) +                       #Exclude outliers
+    geom_smooth(formula = y ~ x, se = FALSE, method = 'loess') + #Add line of best fit
+    theme_minimal() #Change theme
+```
+
+```{r}
+#TotalPrice - Key Variable
+
+#3
+#TotalPrice Variation by Country
+#Plotting a bar graph illustrating the variation in Total Price of customer purchases by Country, from December 2010 - December 2011
+#Including outliers
+
+options(scipen = 999) #Removing Scientific Notation
+
+#Plotting the bar graph
+ggplot(
+  data= TotalPriceByCountry,
+  mapping = aes( x= Country, y=SumPrice )
+) +
+  geom_bar(stat="identity") +   #Change from density to allow for x and y variables
+  coord_flip() +                #Flip coords for axis legibility
+  labs(                         #Change lables
+    y = "Total Price of Customer Purchases",
+    x = "Country",
+    title= "Variation in Total Price of Customer Purchases per Country December 2010- December 2011",
+    subtitle = "Including Outliers"
+    ) +
+  theme_minimal() #Change theme
+```
+
+```{r}
+#TotalPrice - Key Variable
+
+#4
+#TotalPrice Variation by Country
+#Plotting a bar graph illustrating the variation in Total Price of customer purchases by Country, from December 2010 - December 2011
+#Excluding Outliers
+
+#filter out outliers
+TotalPriceByCountryOutliers <- TotalPriceByCountry |>
+  filter(SumPrice < 1500000)
+
+#Plotting th ebar graph
+ggplot(
+  data = TotalPriceByCountryOutliers,
+  mapping = aes(x= Country, y= SumPrice)
+) + 
+  geom_bar(stat = "identity") + #Change from density to allow for x and y variables
+  coord_flip() +                #Flip coords for axis legibility
+  labs(                         #Change labels
+    y = "Total Price of Customer Purchases",
+    x = "Country",
+    title= "Variation in Total Price of Customer Purchases per Country December 2010- December 2011",
+    subtitle = "Excluding Outliers"
+    ) +
+  theme_minimal()               #Change theme to minimal
+```

@@ -1,0 +1,400 @@
+---
+title: "25933337_Project1"
+format: pdf
+editor: visual
+---
+
+# SI 348 Assignment File
+
+## Project 1: Global Development Indicators
+
+### Loading Packages
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(rebus)
+library(ggplot2)
+library(viridis)
+```
+
+### Data Cleaning and Preparation
+
+#### Loading the Provided Dataset into R for Project 1
+
+```{r}
+#The provided data set for Project 1 is loaded into R using a relative path in order to make the code fully reproducible.
+
+global_dev_path <- "Data/project_1_data/Global_Development_Indicators.csv" #Using a relative path
+global_dev <- read_csv(global_dev_path) 
+```
+
+#### Performing the Initial Inspection
+
+```{r}
+head(global_dev)
+glimpse(global_dev)
+view(global_dev)
+```
+
+#### Inspecting Column Values
+
+```{r}
+#Due to the large amount of columns in the dataset, it is essential that the dataset be pivoted before it can be fully inspected.
+
+options(scipen = 999) #Disable scientific notation
+options(warn = -1) #Don't show warnings
+
+global_dev <- global_dev |>
+  pivot_longer( #Pivoting the dataset
+    cols = !c(`Country Name`, `Country Code`, `Series Name`, `Series Code`),
+    names_to = 'Year',
+    values_to = 'Total'
+  ) |>
+  filter(Total !='..') |> #Filtering out fixed values
+  mutate( #Changing column data types
+    Total = parse_number(Total),
+    Year = parse_number(Year),
+    )
+
+#Inspecting the data
+global_dev |> #Amount of distinct Series Names 
+  distinct(`Series Name`) |>
+  view()
+
+global_dev |> #Amount of distinct Country Names 
+  distinct(`Country Name`) |>
+  view()
+```
+
+#### Cleaning the Data
+
+```{r}
+#Tidying the data so there is one variable per column by splitting Series Name into Series Name and Measurement using regular expressions
+
+global_dev <- global_dev |>
+    mutate( # Splitting Series Name into Series Name and Measurement
+  Measurement = case_when(
+    str_detect(`Series Name`, '\\(mm per year\\)') ~ '(mm per year)',
+    str_detect(`Series Name`, '\\(years\\)') ~ '(duration in years)',
+    str_detect(`Series Name`, ': Estimate') ~ 'Estimate',
+    str_detect(`Series Name`, '\\(% of government expenditure on education\\)') ~ '(% of government expenditure on education)',
+    str_detect(`Series Name`, '\\(constant 2015 US\\$\\)') ~ '(constant 2015 US$)',
+    str_detect(`Series Name`, '\\(current US\\$\\)') ~ '(current US$)',
+    str_detect(`Series Name`, '\\(\\% of population\\)') ~ '(% of population)',
+    str_detect(`Series Name`, '\\(\\% of GDP\\)') ~ '(% of GDP)',
+    str_detect(`Series Name`, '\\(per 100 people\\)') ~ '(per 100 people)',
+    str_detect(`Series Name`, '\\(\\% of cohort\\)') ~ '(% of cohort)',
+    str_detect(`Series Name`, '\\(annual \\%\\)') ~ '(annual %)',
+    str_detect(`Series Name`, '\\(\\% of sales for affected firms\\)') ~ '(% of sales for affected firms)',
+    str_detect(`Series Name`, 'Gini index') ~ 'percentage',
+    str_detect(`Series Name`, '\\(\\% of lower secondary school age\\)') ~ '(% of lower secondary school age)',
+    str_detect(`Series Name`, '\\(kWh per capita\\)') ~ '(kWh per capita)',
+    str_detect(`Series Name`, '\\(% of total\\)') ~ '(% of total)',
+    str_detect(`Series Name`, '\\, number of arrivals') ~ 'Number of Arrivals',
+    TRUE ~ 'Total'
+  ),
+    `Series Name` = `Series Name` |> #Removing Measurement from Series Name
+                  str_remove('\\(mm per year\\)') |>
+                  str_remove('\\(years\\)') |>
+                  str_remove(', duration') |>
+                  str_remove(': Estimate') |>
+                  str_remove('\\(% of government expenditure on education\\)') |>
+                  str_remove('\\(constant 2015 US\\$\\)') |>
+                  str_remove('\\(current US\\$\\)') |>
+                  str_remove('\\(\\% of population\\)') |>
+                  str_remove(', total') |>
+                  str_remove('\\(\\% of GDP\\)') |>
+                  str_remove('\\(per 100 people\\)') |>
+                  str_remove('\\(\\% of cohort\\)') |>
+                  str_remove('\\(annual \\%\\)') |>
+                  str_remove('\\(\\% of sales for affected firms\\)') |>
+                  str_remove('\\(\\% of lower secondary school age\\)') |>
+                  str_remove('\\(kWh per capita\\)') |>
+                  str_remove('\\(% of total\\)') |>
+                  str_remove('\\, number of arrivals'),
+  `Series Name` = trimws(`Series Name`) #Trim white space aroung Series Name
+    )
+
+View(global_dev) #View and confirm updates were successfull
+```
+
+#### Filtering the Data
+
+```{r}
+global_dev <- global_dev |> #Group by Country Name and Series Name
+  group_by(`Country Name`,`Series Name`) |>
+  view()
+```
+
+### Exploratory Data Analysis
+
+#### Summary Statistics
+
+```{r}
+#Mean statistics of key variables by Country
+#The mean is calculated for key variables which are not linear
+
+# Control of Corruption: 1
+corrup_control_per_country <- global_dev |>
+  filter(`Series Name` == 'Control of Corruption') |>  # Filter for Control of Corruption series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_corrup_control = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_corrup_control))
+corrup_control_per_country
+
+# Expenditure on primary education: 2
+prim_edu_per_country <- global_dev |>
+  filter(`Series Name` == 'Expenditure on primary education') |>  # Filter for Expenditure on primary education series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_prim_edu = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_prim_edu))
+prim_edu_per_country
+
+# Expenditure on secondary education: 3
+sec_edu_per_country <- global_dev |>
+  filter(`Series Name` == 'Expenditure on secondary education') |>  # Filter for Expenditure on secondary education series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_sec_edu = mean(Total, na.rm = TRUE), .groups = 'drop')
+sec_edu_per_country
+
+# Expenditure on tertiary education: 4
+ter_edu_per_country <- global_dev |>
+  filter(`Series Name` == 'Expenditure on tertiary education') |>  # Filter for Expenditure on tertiary education series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_ter_edu = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_ter_edu))
+ter_edu_per_country
+
+# Military expenditure: 5
+militaryexp_per_country <- global_dev |>
+  filter(`Series Name` == 'Military expenditure') |>  # Filter for Military expenditure series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_militaryexp = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_militaryexp))
+militaryexp_per_country
+
+# Gini index: 6
+gini_per_country <- global_dev |>
+  filter(`Series Name` == 'Gini index') |>  # Filter for Gini index series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_gini = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_gini))
+gini_per_country
+
+# Electric power consumption: 7
+power_consump_per_country <- global_dev |>
+  filter(`Series Name` == 'Electric power consumption') |>  # Filter for Electric power consumption series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_power_consump = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_power_consump))
+power_consump_per_country
+
+# Electricity production from coal sources: 8
+elec_coal_per_country <- global_dev |>
+  filter(`Series Name` == 'Electricity production from coal sources') |>  # Filter for Electricity production from coal sources series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_elec_coal = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_elec_coal))
+elec_coal_per_country
+
+# International tourism: 9
+tourism_per_country <- global_dev |>
+  filter(`Series Name` == 'International tourism') |>  # Filter for International tourism series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_tourism = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_tourism))
+tourism_per_country
+
+# Research and development expenditure: 10
+research_dev_per_country <- global_dev |>
+  filter(`Series Name` == 'Research and development expenditure') |>  # Filter for Research and development expenditure series
+  group_by(`Country Name`) |>  # Group by Country Name
+  summarise(mean_research_dev = mean(Total, na.rm = TRUE), .groups = 'drop') |>
+  arrange(desc(mean_research_dev))
+research_dev_per_country
+
+```
+
+#### Visualisations
+
+```{r}
+#Change in GDP over time
+
+# Filter and arrange the data
+GDP_per_country <- global_dev |>
+  filter(`Series Name` == 'GDP' & Measurement == '(current US$)') |>
+  arrange(`Country Name`, Year) |>
+  group_by(`Country Name`) |>
+  mutate(Percentage_Change = (lead(Total) - Total) / Total * 100)
+GDP_per_country
+
+# Remove NA values (for the last year of each country)
+GDP_per_country <- GDP_per_country |>
+  filter(!is.na(Percentage_Change))
+
+# Create the plot
+ggplot(
+  data = GDP_per_country,
+  mapping = aes(x = Year, y = `Country Name`, fill = Percentage_Change)
+) +
+  geom_tile() +
+  scale_fill_viridis(option = "C", direction = -1) + # Choose a viridis palette
+  theme_minimal() + # Optional: Change the theme for a cleaner look
+  labs(
+    title = "Percentage Change in GDP per Country",
+    fill = "Percentage Change (%)" # Add a label for the fill legend
+  )
+```
+
+```{r}
+#1
+#Variable Calculation - GDP per Capita as of 2022 in current US$
+
+#Calculating GDP per Capita by isolating GDP and Population into columns
+GDP_per_capita2022 <- global_dev |>
+  filter(`Series Name`=='Population' & Year==2022 | `Series Name`=='GDP' & Year==2022 & Measurement == '(current US$)') |>
+  pivot_wider( #Pivot data wider to calculate variable
+    names_from = `Series Name`,
+    values_from = Total,
+  ) |>
+  group_by(`Country Name`) |>
+  summarise( #Combine rows by summarising
+    GDP = sum(GDP, na.rm = TRUE),  
+    Population = sum(Population, na.rm = TRUE)     
+  ) |>
+  mutate(
+    GDPperCapita = GDP/Population
+  ) |>
+  filter(GDPperCapita != 0) |> #Filter out invalid data
+  arrange(desc(GDPperCapita))
+GDP_per_capita2022
+
+#Bar graph
+ggplot(
+  data = GDP_per_capita2022,
+  mapping = aes(x = `Country Name`, y = GDPperCapita)
+) +
+  geom_bar(stat = 'identity', fill = "firebrick1") + # Set bar color
+  coord_flip() +
+  labs(
+    title = "GDP per Capita by Country (2022)",
+    x = "Country",
+    y = "GDP per Capita (current US$)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8)) # Adjust y-axis text size for readability
+
+#2
+#Variable Calculation - GDP per Capita as of 2023 in current US$
+
+#Calculating GDP per Capita by isolating GDP and Population into columns
+GDP_per_capita2023 <- global_dev |>
+  filter(`Series Name`=='Population' & Year==2023 | `Series Name`=='GDP' & Year==2023 & Measurement == '(current US$)') |>
+  pivot_wider( #Pivot data wider to calculate variable
+    names_from = `Series Name`,
+    values_from = Total,
+  ) |>
+  group_by(`Country Name`) |>
+  summarise( #Combine rows by summarising
+    GDP = sum(GDP, na.rm = TRUE),  
+    Population = sum(Population, na.rm = TRUE)     
+  ) |>
+  mutate(
+    GDPperCapita = GDP/Population
+  ) |>
+  filter(GDPperCapita != 0) |> #Filter out invalid data
+  arrange(desc(GDPperCapita))
+GDP_per_capita2023
+
+#Bar graph
+ggplot(
+  data = GDP_per_capita2023,
+  mapping = aes(x = `Country Name`, y = GDPperCapita)
+) +
+  geom_bar(stat = 'identity', fill = "steelblue") + # Set bar color
+  coord_flip() +
+  labs(
+    title = "GDP per Capita by Country (2023)",
+    x = "Country",
+    y = "GDP per Capita (current US$)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8)) # Adjust y-axis text size for readability
+
+#Stacked Bar graph of 1 and 2
+
+# Add year to graph 1 and reassign to GDP_per_capita2022
+GDP_per_capita2022 <- GDP_per_capita2022 |>
+  mutate(Year = 2022)
+
+# Add year to graph 2 and reassign to GDP_per_capita2023
+GDP_per_capita2023 <- GDP_per_capita2023 |>
+  mutate(Year = 2023)
+
+# Combine the two dataframes
+combined_gdp <- bind_rows(GDP_per_capita2022, GDP_per_capita2023)
+
+# Create the bar plot
+ggplot(
+  data = combined_gdp, 
+  mapping = aes(x = `Country Name`, y = GDPperCapita, fill = factor(Year))  # Add fill aesthetic for year
+) +
+  geom_bar(stat = 'identity', position = position_dodge()) +  # Use position_dodge for side-by-side bars
+  coord_flip() +  # Flip coordinates for better readability
+  labs(
+    title = "GDP per Capita by Country (2022 vs 2023)",
+    x = "Country Name",
+    y = "GDP per Capita (current US$)",
+    fill = "Year"  # Legend title
+  ) +
+  scale_fill_manual(values = c("2022" = "firebrick1", "2023" = "steelblue")) +  # Set custom colors
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))  # Adjust y-axis text size for readability
+
+```
+
+```{r fig.width=7, fig.height=6}
+
+#GDP vs Gini Index
+options(warn = -1) #Don't show warning
+
+# Filter GDP data for 2022
+GDP_per_country <- global_dev |>
+  filter(`Series Name` == 'GDP' & Measurement == '(current US$)') |>
+  arrange(`Country Name`, Year) |>
+  # Keep only 2022 data
+  filter(Year == 2022) |> 
+  select(`Country Name`, Total) |> 
+  rename(GDP = Total)  # Rename for clarity
+
+# Filter Gini index data for 2022
+gini_index <- global_dev |>
+  filter(`Series Name` == 'Gini index' & Year == 2022) |>
+  select(`Country Name`, Total) |>
+  rename(Gini_Index = Total)  # Rename Total to Gini_Index for clarity
+
+# Combine the datasets using inner_join to keep only countries present in both
+combined_data <- GDP_per_country |> 
+  inner_join(gini_index, by = "Country Name")
+
+#Create line graph for Gini Index and GDP
+ggplot(
+  data = combined_data
+  ) +
+  geom_point(aes(x = GDP, y = Gini_Index, color = `Country Name`), size = 3) +  # Add points
+  geom_smooth(aes(x = GDP, y = Gini_Index), formula = y ~ x, method = "lm", se = FALSE, color = "black", linetype = "dashed") +  # Line of best fit
+  labs(
+    title = "Comparison of Gini Index and GDP by Country (2022)",
+    x = "GDP (Current US$)",
+    y = "Gini Index (%)",
+    color = "Country"  # Legend title
+  ) +
+  theme_minimal()
+
+
+
+```
